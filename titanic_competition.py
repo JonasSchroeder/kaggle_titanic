@@ -112,7 +112,7 @@ test_df["Deck"].replace("B B", "B", inplace=True)
 test_df["Deck"].replace("B B B", "B", inplace=True)
 test_df["Deck"].replace("B B B B", "B", inplace=True)
 test_df["Deck"].replace("C C", "C", inplace=True)
-train_df["Deck"].replace("E E", "E", inplace=True)
+test_df["Deck"].replace("E E", "E", inplace=True)
 test_df["Deck"].replace("D D", "D", inplace=True)
 test_df["Deck"].replace("C C C", "C", inplace=True)
 test_df["Deck"].replace("F G", "F", inplace=True)
@@ -484,10 +484,10 @@ export_df["Survived"] = y_test.astype(int)
 export_df.to_csv("log_reg_tuned.csv", index=False)
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Voting Classifier TUNED  0.83
+# Voting Classifier TUNED  hard 0.83, weighted soft 0.82
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, GridSearchCV
 from sklearn.ensemble import VotingClassifier
 
 X_train = train_df_transformed.drop(columns=["Survived"])
@@ -496,22 +496,27 @@ y_train = train_df_transformed["Survived"]
 best_lr = best_lr_clf.best_estimator_
 best_rf = best_rnd_clf.best_estimator_
 
-voting_clf_hard = VotingClassifier(estimators=[("rnd_clf", best_rf), ("lr", best_lr), ("gnb", gnb)], voting = 'hard') 
-voting_clf_soft = VotingClassifier(estimators=[("rnd_clf", best_rf), ("lr", best_lr), ("gnb", gnb)], voting = 'soft') 
+# Hard Voting
 
+voting_clf_hard = VotingClassifier(estimators=[("rnd_clf", best_rf), ("lr", best_lr), ("gnb", gnb)], voting = 'hard') 
 
 print('voting_clf_hard :',cross_val_score(voting_clf_hard,X_train,y_train,cv=5))
 print('voting_clf_hard mean :',cross_val_score(voting_clf_hard,X_train,y_train,cv=5).mean()) #0.83
 
-#print('voting_clf_soft :',cross_val_score(voting_clf_soft,X_train,y_train,cv=5))
-#print('voting_clf_soft mean :',cross_val_score(voting_clf_soft,X_train,y_train,cv=5).mean()) #0.79
-
 voting_clf_hard.fit(X_train, y_train)
-#voting_clf_soft.fit(X_train, y_train)
-
-
 y_test = voting_clf_hard.predict(test_df_transformed)
-#y_test = voting_clf_soft.predict(test_df_transformed)
+
+# Soft Voting with optimized weights
+
+voting_clf_soft = VotingClassifier(estimators=[("rnd_clf", best_rf), ("lr", best_lr), ("gnb", gnb)], voting = 'soft') 
+
+params = {'weights' : [[1,1,1],[1,2,1],[1,1,2],[2,1,1],[2,2,1],[1,2,2],[2,1,2]]}
+vote_weight = GridSearchCV(voting_clf_soft, param_grid = params, cv = 5, verbose = True, n_jobs = -1)
+best_clf_weight = vote_weight.fit(X_train, y_train)
+print("Best Weighted Vote Score: " + str(best_clf_weight .best_score_))
+print("Best Parameter:  " + str(best_clf_weight .best_params_)) #0.82
+
+y_test = best_clf_weight.best_estimator_.predict(test_df_transformed)
 
 
 # Export for submit
@@ -520,4 +525,69 @@ export_df["PassengerId"] = test_df_transformed["PassengerId"].astype(int)
 export_df["Survived"] = y_test.astype(int)
 export_df.to_csv("voting_hard_tuned.csv", index=False)
 #export_df.to_csv("voting_soft_tuned.csv", index=False)
+
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+# Random Forest TUNED without cabin/deck features 0.839
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.ensemble import RandomForestClassifier
+
+train_df_transformed.columns
+X_train = train_df_transformed.drop(columns=["Survived", 'x2_A', 'x2_B', 'x2_C', 'x2_D', 'x2_E', 'x2_F', 'x2_G', 'x2_T', 'x2_Unknown'])
+y_train = train_df_transformed["Survived"]
+
+# Random forrest classifier
+rf = RandomForestClassifier()
+
+# Find optimal parameter settings using Randomized Search
+# Round 1: Board
+param_grid =  {'n_estimators': [100,500,1000], 
+               'bootstrap': [True,False],
+               'criterion': ["entropy", "gini"],
+               'max_depth': [50,75,100,125,150,None],
+               'max_features': ['auto','sqrt'],
+               'min_samples_leaf': [1,2,4,10],
+               'min_samples_split': [5,10,15]}
+
+rnd_clf = RandomizedSearchCV(rf, param_distributions=param_grid, n_iter=100, cv=5, verbose=True, n_jobs=-1)
+
+best_rnd_clf = rnd_clf.fit(X_train, y_train)
+print("Best Random Forest Score: " + str(best_rnd_clf .best_score_))
+print("Best Parameter:  " + str(best_rnd_clf .best_params_))
+
+# Find optimal parameter settings using Randomized Search
+# Round 2: Specified
+param_grid =  {'n_estimators': [25,50,75,100], 
+               'bootstrap': [True],
+               'criterion': ["entropy", "gini"],
+               'max_depth': [50,75,100,125,150,175,200,None],
+               'max_features': ['auto'],
+               'min_samples_leaf': [1,2,4],
+               'min_samples_split': [2,5,10,15]}
+
+rnd_clf = RandomizedSearchCV(rf, param_distributions=param_grid, n_iter=300, cv=5, verbose=True, n_jobs=-1)
+
+best_rnd_clf = rnd_clf.fit(X_train, y_train)
+print("Best Random Forest Score: " + str(best_rnd_clf .best_score_))
+print("Best Parameter:  " + str(best_rnd_clf .best_params_))
+
+test_df_transformed_short = test_df_transformed.drop(columns=['x2_A', 'x2_B', 'x2_C', 'x2_D', 'x2_E', 'x2_F', 'x2_G', 'x2_Unknown'])
+y_test = rnd_clf.predict(test_df_transformed_short)
+
+# Feature Importance
+best_rf = best_rnd_clf.best_estimator_.fit(X_train, y_train)
+feat_importances = pd.Series(best_rf.feature_importances_, index=X_train.columns)
+feat_importances.nlargest(20).plot(kind='barh')
+
+# Export for submit
+export_df = pd.DataFrame()
+export_df["PassengerId"] = test_df_transformed["PassengerId"].astype(int)
+export_df["Survived"] = y_test.astype(int)
+export_df.to_csv("rnd_clf_tuned_nocabin.csv", index=False)
+
+
+
+
 
