@@ -39,6 +39,8 @@ Titanic Path: Southampton -> Cherbourg -> Queenstown
 train_df = pd.read_csv("train.csv")
 test_df = pd.read_csv("test.csv")
 
+train_df.info()
+
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 # Data Transformation
 #------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -58,6 +60,9 @@ train_df["Embarked"].fillna("Unknown", inplace=True)
 
 # Replace NA for Cabin with "Unknown"
 train_df["Cabin"].fillna("Unknown", inplace=True)
+
+# Extract Name Title
+train_df["Title"] = train_df.Name.apply(lambda x: x.split(",")[1].split(".")[0].strip())
 
 # Extract deck from Cabin
 for i in range(0, len(train_df)):
@@ -91,6 +96,9 @@ test_df["Embarked"].fillna("Unknown", inplace=True)
 
 # Replace NA for Cabin with "Unknown"
 test_df["Cabin"].fillna("Unknown", inplace=True)
+
+# Extract Name Title
+test_df["Title"] = test_df.Name.apply(lambda x: x.split(",")[1].split(".")[0].strip())
 
 # Extract deck from Cabin
 for i in range(0, len(test_df)):
@@ -134,6 +142,11 @@ count_class = train_df["Pclass"].value_counts()
 count_class.plot.bar()
 plt.title("Number per Class")
 
+# Number per Title
+count_title = train_df["Title"].value_counts()
+count_title.plot.bar()
+plt.title("Number per Title")
+
 # Number of siblings or spouses
 count_sibsp = train_df["SibSp"].value_counts()
 count_sibsp.plot.bar()
@@ -152,13 +165,42 @@ plt.title("Number per Deck")
 # Age Histogram -> how to deal with age na (177)?
 train_df["Age"].plot.hist()
 
-# Cabin Histogram -> how to deal with cabin na (687)?
-
 # Average fare per class
 train_df.groupby("Pclass").agg({"Fare":"mean"})
 
 # compare survived vs non-survived
 sns.displot(train_df, x="Fare", hue="Survived")
+
+# Survivor split Class
+tbl = pd.pivot_table(train_df, index="Survived", columns="Pclass", values="Ticket", aggfunc="count")
+ax = tbl.T.plot(kind='bar')
+
+# Survivor split Sex
+tbl = pd.pivot_table(train_df, index="Survived", columns="Sex", values="Ticket", aggfunc="count")
+ax = tbl.T.plot(kind='bar') # female survive
+
+# Survivor split SibSp
+tbl = pd.pivot_table(train_df, index="Survived", columns="SibSp", values="Ticket", aggfunc="count")
+ax = tbl.T.plot(kind='bar')
+
+# Survivor split Title
+tbl = pd.pivot_table(train_df, index="Survived", columns="Title", values="Ticket", aggfunc="count")
+ax = tbl.T.plot(kind='bar') # -> same as for sex
+
+# Survivor split Embarked
+tbl = pd.pivot_table(train_df, index="Survived", columns="Embarked", values="Ticket", aggfunc="count")
+ax = tbl.T.plot(kind='bar')
+
+# Survivor split Deck
+tbl = pd.pivot_table(train_df, index="Survived", columns="Deck", values="Ticket", aggfunc="count")
+ax = tbl.T.plot(kind='bar') # unknown deck for vast majority of people?
+
+# Fare per Deck, Port, Class
+fare_per_group = train_df.groupby(["Deck", "Embarked", "Pclass"]).agg({"Fare": "mean"})
+train_df.groupby(["Embarked"]).agg({"Fare": "mean"}) # unknown port highest average price - why? reason: all from deck B
+train_df.groupby(["Deck"]).agg({"Fare": "mean"}) # B > C > D > E > A > rest
+train_df.groupby(["Pclass"]).agg({"Fare": "mean"}) # positive price-class relationship
+
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 # Pre-processing: Standardization and One-Hot Encoding
@@ -205,20 +247,22 @@ column_names = num_attribs + list(col_transformer.named_transformers_['cat'].get
 test_df_transformed.columns = column_names
 
 
-
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Random Forest Classifier
+# Random Forest Classifier 0.80
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
+from sklearn.model_selection import cross_val_score
 from sklearn.ensemble import RandomForestClassifier
-
-train_df_transformed.columns
 
 X_train = train_df_transformed.drop(columns=["Survived"])
 y_train = train_df_transformed["Survived"]
 
-
+# Random forrest classifier
 rnd_clf = RandomForestClassifier(n_estimators=500, n_jobs=-1)
+
+cv_rnd_clf = cross_val_score(rnd_clf, X_train, y_train, cv=5)
+print(cv_rnd_clf)
+print("mean accuracy: " + str(cv_rnd_clf.mean()))
 
 rnd_clf.fit(X_train, y_train)
 
@@ -235,6 +279,81 @@ export_df["Survived"] = y_test.astype(int)
 export_df.to_csv("rnd_clf_simple.csv", index=False)
 
 
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+# Logistic Regression 0.81
+#------------------------------------------------------------------------------------------------------------------------------------------------------
 
+from sklearn.model_selection import cross_val_score
+from sklearn.linear_model import LogisticRegression
+
+X_train = train_df_transformed.drop(columns=["Survived"])
+y_train = train_df_transformed["Survived"]
+
+#  Logistic regression
+lr = LogisticRegression(max_iter=2000)
+
+cv_lr = cross_val_score(lr, X_train, y_train, cv=5)
+print(cv_lr)
+print("mean accuracy: " + str(cv_lr.mean()))
+
+lr.fit(X_train, y_train)
+
+y_test = lr..predict(test_df_transformed)
+
+# Feature importance
+
+# Export for submit
+export_df = pd.DataFrame()
+export_df["PassengerId"] = test_df_transformed["PassengerId"].astype(int)
+export_df["Survived"] = y_test.astype(int)
+export_df.to_csv("log_reg_simple.csv", index=False)
+
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+# Naive Bayes 0.72
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+
+from sklearn.model_selection import cross_val_score
+from sklearn.naive_bayes import GaussianNB
+
+X_train = train_df_transformed.drop(columns=["Survived"])
+y_train = train_df_transformed["Survived"]
+
+#  Logistic regression
+gnb = GaussianNB()
+
+cv_gnb = cross_val_score(gnb, X_train, y_train, cv=5)
+print(cv_gnb)
+print("mean accuracy: " + str(cv_gnb.mean()))
+
+gnb.fit(X_train, y_train)
+
+y_test = gnb.predict(test_df_transformed)
+
+# Feature importance
+
+# Export for submit
+export_df = pd.DataFrame()
+export_df["PassengerId"] = test_df_transformed["PassengerId"].astype(int)
+export_df["Survived"] = y_test.astype(int)
+export_df.to_csv("log_reg_simple.csv", index=False)
+
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+# Voting Classifier 0.79
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+
+from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import VotingClassifier
+
+X_train = train_df_transformed.drop(columns=["Survived"])
+y_train = train_df_transformed["Survived"]
+
+#  Voting Classifier
+voting_clf = VotingClassifier(estimators=[("rnd_clf", rnd_clf), ("lr", lr), ("gnb", gnb)], voting="soft")
+
+cv_voting = cross_val_score(voting_clf, X_train, y_train, cv=5)
+print(cv_voting)
+print("mean accuracy: " + str(cv_voting.mean()))
 
 
