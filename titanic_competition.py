@@ -298,7 +298,7 @@ print("mean accuracy: " + str(cv_lr.mean()))
 
 lr.fit(X_train, y_train)
 
-y_test = lr..predict(test_df_transformed)
+y_test = lr.predict(test_df_transformed)
 
 # Feature importance
 
@@ -336,7 +336,7 @@ y_test = gnb.predict(test_df_transformed)
 export_df = pd.DataFrame()
 export_df["PassengerId"] = test_df_transformed["PassengerId"].astype(int)
 export_df["Survived"] = y_test.astype(int)
-export_df.to_csv("log_reg_simple.csv", index=False)
+export_df.to_csv("nb_simple.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -355,5 +355,17 @@ voting_clf = VotingClassifier(estimators=[("rnd_clf", rnd_clf), ("lr", lr), ("gn
 cv_voting = cross_val_score(voting_clf, X_train, y_train, cv=5)
 print(cv_voting)
 print("mean accuracy: " + str(cv_voting.mean()))
+
+voting_clf.fit(X_train, y_train)
+
+y_test = voting_clf.predict(test_df_transformed)
+
+# Feature importance
+
+# Export for submit
+export_df = pd.DataFrame()
+export_df["PassengerId"] = test_df_transformed["PassengerId"].astype(int)
+export_df["Survived"] = y_test.astype(int)
+export_df.to_csv("voting_simple.csv", index=False)
 
 
