@@ -52,8 +52,8 @@ train_df["Pclass"].replace(1, "Upper", inplace=True)
 train_df["Pclass"].replace(2, "Middle", inplace=True)
 train_df["Pclass"].replace(3, "Lower", inplace=True)
 
-# Replace missing age with average
-train_df["Age"].fillna(np.mean(train_df["Age"]), inplace=True)
+# Replace missing age with median
+train_df["Age"].fillna(np.nanmedian(train_df["Age"]), inplace=True)
 
 # Replace NA for embarked with "Unknown"
 train_df["Embarked"].fillna("Unknown", inplace=True)
@@ -63,6 +63,8 @@ train_df["Cabin"].fillna("Unknown", inplace=True)
 
 # Extract Name Title
 train_df["Title"] = train_df.Name.apply(lambda x: x.split(",")[1].split(".")[0].strip())
+title_list = ["Mr", "Miss", "Mrs", "Master", "Dr", "Rev", "Col"]
+train_df.loc[~train_df["Title"].isin(title_list), "Title"] = "NA"
 
 # Extract deck from Cabin
 for i in range(0, len(train_df)):
@@ -85,11 +87,11 @@ test_df["Pclass"].replace(1, "Upper", inplace=True)
 test_df["Pclass"].replace(2, "Middle", inplace=True)
 test_df["Pclass"].replace(3, "Lower", inplace=True)
 
-# Replace missing age with average
-test_df["Age"].fillna(np.mean(test_df["Age"]), inplace=True)
+# Replace missing age with median
+test_df["Age"].fillna(np.nanmedian(test_df["Age"]), inplace=True)
 
-# Replace missing fare with average
-test_df["Fare"].fillna(np.mean(test_df["Fare"]), inplace=True)
+# Replace missing fare with median
+test_df["Fare"].fillna(np.nanmedian(test_df["Fare"]), inplace=True)
 
 # Replace NA for embarked with "Unknown"
 test_df["Embarked"].fillna("Unknown", inplace=True)
@@ -99,6 +101,8 @@ test_df["Cabin"].fillna("Unknown", inplace=True)
 
 # Extract Name Title
 test_df["Title"] = test_df.Name.apply(lambda x: x.split(",")[1].split(".")[0].strip())
+title_list = ["Mr", "Miss", "Mrs", "Master", "Dr", "Rev", "Col"]
+test_df.loc[~test_df["Title"].isin(title_list), "Title"] = "NA"
 
 # Extract deck from Cabin
 for i in range(0, len(test_df)):
@@ -137,6 +141,7 @@ count_survived = train_df["Survived"].value_counts()
 count_survived .plot.bar()
 plt.title("Number of Survivors")
 
+
 # Number per class
 count_class = train_df["Pclass"].value_counts()
 count_class.plot.bar()
@@ -174,26 +179,32 @@ sns.displot(train_df, x="Fare", hue="Survived")
 # Survivor split Class
 tbl = pd.pivot_table(train_df, index="Survived", columns="Pclass", values="Ticket", aggfunc="count")
 ax = tbl.T.plot(kind='bar')
+sns.countplot(data=train_df, y="Survived", hue="Pclass", color="Orange" )
 
 # Survivor split Sex
 tbl = pd.pivot_table(train_df, index="Survived", columns="Sex", values="Ticket", aggfunc="count")
 ax = tbl.T.plot(kind='bar') # female survive
+sns.countplot(data=train_df, y="Survived", hue="Sex", color="Orange" )
 
 # Survivor split SibSp
 tbl = pd.pivot_table(train_df, index="Survived", columns="SibSp", values="Ticket", aggfunc="count")
 ax = tbl.T.plot(kind='bar')
+sns.countplot(data=train_df, y="Survived", hue="SibSp", color="Orange" )
 
 # Survivor split Title
 tbl = pd.pivot_table(train_df, index="Survived", columns="Title", values="Ticket", aggfunc="count")
 ax = tbl.T.plot(kind='bar') # -> same as for sex
+# sns.countplot(data=train_df, y="Survived", hue="Title", color="Orange" )
 
 # Survivor split Embarked
 tbl = pd.pivot_table(train_df, index="Survived", columns="Embarked", values="Ticket", aggfunc="count")
 ax = tbl.T.plot(kind='bar')
+sns.countplot(data=train_df, y="Survived", hue="Embarked", color="Orange" )
 
 # Survivor split Deck
 tbl = pd.pivot_table(train_df, index="Survived", columns="Deck", values="Ticket", aggfunc="count")
 ax = tbl.T.plot(kind='bar') # unknown deck for vast majority of people?
+sns.countplot(data=train_df, y="Survived", hue="Deck", color="Orange" )
 
 # Fare per Deck, Port, Class
 fare_per_group = train_df.groupby(["Deck", "Embarked", "Pclass"]).agg({"Fare": "mean"})
@@ -217,7 +228,7 @@ train_df_pre = train_df.drop(columns=["PassengerId", "Name", "Ticket", "Cabin"])
 test_df_pre = test_df.drop(columns=[ "Name", "Ticket", "Cabin"])
 
 num_attribs = ["Age", "SibSp", "Parch", "Fare"]
-cat_attribs = ["Pclass", "Embarked", "Deck", "Sex"]
+cat_attribs = ["Pclass", "Embarked", "Deck", "Sex", "Title"]
 
 col_transformer = ColumnTransformer([
     ("num", StandardScaler(), num_attribs),
@@ -230,6 +241,7 @@ train_array_transformed = col_transformer.fit_transform(train_df_pre)
 
 # Convert numpy.ndarray to pd.DataFrame
 train_df_transformed = pd.DataFrame(data=train_array_transformed)
+#train_df_transformed = pd.DataFrame(data=train_array_transformed.toarray())
 
 # Rename columns
 column_names = num_attribs + list(col_transformer.named_transformers_['cat'].get_feature_names()) + ["Survived"]
@@ -248,7 +260,7 @@ test_df_transformed.columns = column_names
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Random Forest Classifier 0.80
+# Random Forest Classifier 0.81
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import cross_val_score
@@ -280,7 +292,7 @@ export_df.to_csv("rnd_clf_simple.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Logistic Regression 0.81
+# Logistic Regression 0.83
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import cross_val_score
@@ -301,6 +313,16 @@ lr.fit(X_train, y_train)
 y_test = lr.predict(test_df_transformed)
 
 # Feature importance
+feature_importance_lr = pd.DataFrame()
+feature_importance_lr["Features"] = X_train.columns
+feature_importance_lr["lr_coeff"] = np.transpose(lr.coef_)
+feature_importance_lr["coef_abs"] = np.transpose(np.abs(lr.coef_))
+
+plt.figure().set_size_inches(10, 6)
+fg3 = sns.barplot(x='Features', y='lr_coeff',data=feature_importance_lr, palette="Blues_d")
+fg3.set_xticklabels(rotation=90, labels=feature_importance_lr.Features)
+plt.title("Logistic Regression Model: Regression Coefs")
+
 
 # Export for submit
 export_df = pd.DataFrame()
@@ -310,7 +332,7 @@ export_df.to_csv("log_reg_simple.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Naive Bayes 0.72
+# Naive Bayes 0.75
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import cross_val_score
@@ -319,7 +341,7 @@ from sklearn.naive_bayes import GaussianNB
 X_train = train_df_transformed.drop(columns=["Survived"])
 y_train = train_df_transformed["Survived"]
 
-#  Logistic regression
+#  Naive Bayes
 gnb = GaussianNB()
 
 cv_gnb = cross_val_score(gnb, X_train, y_train, cv=5)
@@ -368,4 +390,134 @@ export_df["PassengerId"] = test_df_transformed["PassengerId"].astype(int)
 export_df["Survived"] = y_test.astype(int)
 export_df.to_csv("voting_simple.csv", index=False)
 
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+# Random Forest Classifier TUNED 0.84
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.ensemble import RandomForestClassifier
+
+X_train = train_df_transformed.drop(columns=["Survived"])
+y_train = train_df_transformed["Survived"]
+
+# Random forrest classifier
+rf = RandomForestClassifier()
+
+# Find optimal parameter settings using Randomized Search
+# Round 1: Board
+param_grid =  {'n_estimators': [100,500,1000], 
+               'bootstrap': [True,False],
+               'max_depth': [50,75,100,125, 150,None],
+               'max_features': ['auto','sqrt'],
+               'min_samples_leaf': [1,2,4,10],
+               'min_samples_split': [5,10,15]}
+
+rnd_clf = RandomizedSearchCV(rf, param_distributions=param_grid, n_iter=100, cv=5, verbose=True, n_jobs=-1)
+
+best_rnd_clf = rnd_clf.fit(X_train, y_train)
+print("Best Random Forest Score: " + str(best_rnd_clf .best_score_))
+print("Best Parameter:  " + str(best_rnd_clf .best_params_))
+
+# Find optimal parameter settings using Randomized Search
+# Round 2: Specified
+param_grid =  {'n_estimators': [400,450,500,550], 
+               'bootstrap': [False],
+               'max_depth': [3,5,10,20,50,75,100,None],
+               'max_features': ['auto'],
+               'min_samples_leaf': [1,2,4],
+               'min_samples_split': [2,5,10]}
+
+rnd_clf = RandomizedSearchCV(rf, param_distributions=param_grid, n_iter=100, cv=5, verbose=True, n_jobs=-1)
+
+best_rnd_clf = rnd_clf.fit(X_train, y_train)
+print("Best Random Forest Score: " + str(best_rnd_clf .best_score_))
+print("Best Parameter:  " + str(best_rnd_clf .best_params_))
+
+
+y_test = rnd_clf.predict(test_df_transformed)
+
+# Feature Importance
+best_rf = best_rnd_clf.best_estimator_.fit(X_train, y_train)
+feat_importances = pd.Series(best_rf.feature_importances_, index=X_train.columns)
+feat_importances.nlargest(20).plot(kind='barh')
+
+# Export for submit
+export_df = pd.DataFrame()
+export_df["PassengerId"] = test_df_transformed["PassengerId"].astype(int)
+export_df["Survived"] = y_test.astype(int)
+export_df.to_csv("rnd_clf_tuned.csv", index=False)
+
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+# Logistic Regression TUNED 0.83 -> no improvement
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+
+from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model import LogisticRegression
+
+X_train = train_df_transformed.drop(columns=["Survived"])
+y_train = train_df_transformed["Survived"]
+
+#  Logistic regression
+lr = LogisticRegression()
+
+# Find optimal parameter settings using GridSearch
+param_grid = {"max_iter" : [2000],
+              "penalty" : ["l1", "l2"],
+              "C" : np.logspace(-4, 4, 20),
+              "solver" : ["liblinear"]}
+    
+lr_clf = GridSearchCV(lr, param_grid=param_grid, cv=5, verbose=True, n_jobs=-1)
+
+best_lr_clf = lr_clf.fit(X_train, y_train)
+print("Best Logistic Regression Score: " + str(best_lr_clf.best_score_))
+print("Best Parameter:  " + str(best_lr_clf.best_params_))
+
+
+y_test = lr_clf.predict(test_df_transformed)
+
+# Export for submit
+export_df = pd.DataFrame()
+export_df["PassengerId"] = test_df_transformed["PassengerId"].astype(int)
+export_df["Survived"] = y_test.astype(int)
+export_df.to_csv("log_reg_tuned.csv", index=False)
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+# Voting Classifier TUNED  0.83
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+
+from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import VotingClassifier
+
+X_train = train_df_transformed.drop(columns=["Survived"])
+y_train = train_df_transformed["Survived"]
+
+best_lr = best_lr_clf.best_estimator_
+best_rf = best_rnd_clf.best_estimator_
+
+voting_clf_hard = VotingClassifier(estimators=[("rnd_clf", best_rf), ("lr", best_lr), ("gnb", gnb)], voting = 'hard') 
+voting_clf_soft = VotingClassifier(estimators=[("rnd_clf", best_rf), ("lr", best_lr), ("gnb", gnb)], voting = 'soft') 
+
+
+print('voting_clf_hard :',cross_val_score(voting_clf_hard,X_train,y_train,cv=5))
+print('voting_clf_hard mean :',cross_val_score(voting_clf_hard,X_train,y_train,cv=5).mean()) #0.83
+
+#print('voting_clf_soft :',cross_val_score(voting_clf_soft,X_train,y_train,cv=5))
+#print('voting_clf_soft mean :',cross_val_score(voting_clf_soft,X_train,y_train,cv=5).mean()) #0.79
+
+voting_clf_hard.fit(X_train, y_train)
+#voting_clf_soft.fit(X_train, y_train)
+
+
+y_test = voting_clf_hard.predict(test_df_transformed)
+#y_test = voting_clf_soft.predict(test_df_transformed)
+
+
+# Export for submit
+export_df = pd.DataFrame()
+export_df["PassengerId"] = test_df_transformed["PassengerId"].astype(int)
+export_df["Survived"] = y_test.astype(int)
+export_df.to_csv("voting_hard_tuned.csv", index=False)
+#export_df.to_csv("voting_soft_tuned.csv", index=False)
 
