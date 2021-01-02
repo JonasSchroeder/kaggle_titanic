@@ -63,8 +63,8 @@ train_df["Age"].fillna(np.nanmedian(train_df["Age"]), inplace=True)
 # With family (overfitting and worse in production)
 # train_df["with_family"] = (train_df["SibSp"] + train_df["Parch"])>0
 
-# Replace NA for embarked with "Unknown"
-train_df["Embarked"].fillna("Unknown", inplace=True)
+# Replace NA for embarked with "S"
+train_df["Embarked"].fillna("S", inplace=True)
 
 # Replace NA for Cabin with "Unknown"
 train_df["Cabin"].fillna("Unknown", inplace=True)
@@ -101,8 +101,8 @@ test_df["Age"].fillna(np.nanmedian(test_df["Age"]), inplace=True)
 # Replace missing fare with median
 test_df["Fare"].fillna(np.nanmedian(test_df["Fare"]), inplace=True)
 
-# Replace NA for embarked with "Unknown"
-test_df["Embarked"].fillna("Unknown", inplace=True)
+# Replace NA for embarked with "S"
+test_df["Embarked"].fillna("S", inplace=True)
 
 # Replace NA for Cabin with "Unknown"
 test_df["Cabin"].fillna("Unknown", inplace=True)
@@ -180,7 +180,8 @@ count_deck.plot.bar()
 plt.title("Number per Deck")
 
 # Age Histogram -> how to deal with age na (177)?
-train_df["Age"].plot.hist()
+sns.histplot(data=train_df, x="Age", binwidth=10, kde=True)
+sns.histplot(data=test_df, x="Age", binwidth=10, kde=True)
 
 # Average fare per class
 train_df.groupby("Pclass").agg({"Fare":"mean"})
@@ -236,7 +237,7 @@ from sklearn.compose import ColumnTransformer
 train_df.columns
 test_df.columns
 
-train_df_pre = train_df.drop(columns=["PassengerId", "Name", "Ticket", "Cabin"])
+train_df_pre = train_df.drop(columns=["Name", "Ticket", "Cabin"])
 test_df_pre = test_df.drop(columns=[ "Name", "Ticket", "Cabin"])
 
 num_attribs = ["Age", "SibSp", "Parch", "Fare"]
@@ -256,7 +257,7 @@ train_df_transformed = pd.DataFrame(data=train_array_transformed)
 #train_df_transformed = pd.DataFrame(data=train_array_transformed.toarray())
 
 # Rename columns
-column_names = num_attribs + list(col_transformer.named_transformers_['cat'].get_feature_names()) + ["Survived"]
+column_names = num_attribs + list(col_transformer.named_transformers_['cat'].get_feature_names()) + ["PassengerId"] + ["Survived"]
 train_df_transformed.columns = column_names
 
 
@@ -294,7 +295,12 @@ print("mean accuracy: " + str(cv_rnd_clf.mean()))
 
 rnd_clf.fit(X_train, y_train)
 
+rnd_clf.score(X_train, y_train) # 0.9842
+
 y_test = rnd_clf.predict(test_df_transformed)
+
+# check number of survivors
+print("Number of survivors predicted: " + str(sum(y_test))) # 140
 
 # Feature Importance
 feat_importances = pd.Series(rnd_clf.feature_importances_, index=X_train.columns)
@@ -308,7 +314,7 @@ export_df.to_csv("rnd_clf_simple.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Logistic Regression 0.8294
+# Logistic Regression 0.8294 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import cross_val_score
@@ -326,7 +332,12 @@ print("mean accuracy: " + str(cv_lr.mean()))
 
 lr.fit(X_train, y_train)
 
+lr.score(X_train, y_train) # 0.83726
+
 y_test = lr.predict(test_df_transformed)
+
+# check number of survivors
+print("Number of survivors predicted: " + str(sum(y_test))) #168
 
 # Feature importance
 feature_importance_lr = pd.DataFrame()
@@ -348,7 +359,7 @@ export_df.to_csv("log_reg_simple.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Naive Bayes 0.7587
+# Naive Bayes 0.7587 -> actual score 0.73444
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import cross_val_score
@@ -366,7 +377,13 @@ print("mean accuracy: " + str(cv_gnb.mean()))
 
 gnb.fit(X_train, y_train)
 
+gnb.score(X_train, y_train) # 0.792368
+
+# Predict survivors
 y_test = gnb.predict(test_df_transformed)
+
+# check number of survivors
+print("Number of survivors predicted: " + str(sum(y_test))) # 207
 
 # Feature importance
 
@@ -396,9 +413,14 @@ print("mean accuracy: " + str(cv_voting.mean()))
 
 voting_clf.fit(X_train, y_train)
 
+voting_clf.score(X_train, y_train) # 0.8675
+
+# Prediction
 y_test = voting_clf.predict(test_df_transformed)
 
-# Feature importance
+# check number of survivors
+print("Number of survivors predicted: " + str(sum(y_test))) # 202
+
 
 # Export for submit
 export_df = pd.DataFrame()
@@ -408,7 +430,7 @@ export_df.to_csv("voting_simple.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Random Forest Classifier TUNED 0.8395
+# Random Forest Classifier TUNED 0.8395 -> actual score ???
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import RandomizedSearchCV
@@ -450,7 +472,13 @@ best_rnd_clf = rnd_clf.fit(X_train, y_train)
 print("Best Random Forest Score: " + str(best_rnd_clf .best_score_))
 print("Best Parameter:  " + str(best_rnd_clf .best_params_))
 
-y_test = rnd_clf.predict(test_df_transformed)
+best_rnd_clf.score(X_train, y_train) # 0.9079
+
+# Prediction
+y_test = best_rnd_clf.predict(test_df_transformed)
+
+# check number of survivors
+print("Number of survivors predicted: " + str(sum(y_test))) # 132
 
 # Feature Importance
 best_rf = best_rnd_clf.best_estimator_.fit(X_train, y_train)
@@ -465,7 +493,7 @@ export_df.to_csv("rnd_clf_tuned.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Logistic Regression TUNED 0.8294 -> no improvement
+# Logistic Regression TUNED 0.8294 -> actual score 0.76315
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import GridSearchCV
@@ -489,8 +517,11 @@ best_lr_clf = lr_clf.fit(X_train, y_train)
 print("Best Logistic Regression Score: " + str(best_lr_clf.best_score_))
 print("Best Parameter:  " + str(best_lr_clf.best_params_))
 
-
+# Prediction
 y_test = lr_clf.predict(test_df_transformed)
+
+# check number of survivors
+print("Number of survivors predicted: " + str(sum(y_test))) # 165
 
 # Export for submit
 export_df = pd.DataFrame()
@@ -499,7 +530,9 @@ export_df["Survived"] = y_test.astype(int)
 export_df.to_csv("log_reg_tuned.csv", index=False)
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Voting Classifier TUNED  hard 0.8238, weighted soft 0.8226 -> hbad in production
+# Voting Classifier TUNED  
+# hard 0.8238 -> actual score 0.76555
+# weighted soft 0.8226  -> actual score 0.76076
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import cross_val_score, GridSearchCV
@@ -519,7 +552,12 @@ print('voting_clf_hard :',cross_val_score(voting_clf_hard,X_train,y_train,cv=5))
 print('voting_clf_hard mean :',cross_val_score(voting_clf_hard,X_train,y_train,cv=5).mean()) #0.83
 
 voting_clf_hard.fit(X_train, y_train)
+
+# Prediction
 y_test = voting_clf_hard.predict(test_df_transformed)
+
+# check number of survivors
+print("Number of survivors predicted: " + str(sum(y_test))) # 174
 
 # Export for submit
 export_df = pd.DataFrame()
@@ -529,7 +567,6 @@ export_df.to_csv("voting_hard_tuned.csv", index=False)
 
 
 # Soft Voting with optimized weights
-
 voting_clf_soft = VotingClassifier(estimators=[("rnd_clf", best_rf), ("lr", best_lr), ("gnb", gnb)], voting = 'soft') 
 
 params = {'weights' : [[1,1,1],[1,2,1],[1,1,2],[2,1,1],[2,2,1],[1,2,2],[2,1,2]]}
@@ -538,7 +575,11 @@ best_clf_weight = vote_weight.fit(X_train, y_train)
 print("Best Weighted Vote Score: " + str(best_clf_weight .best_score_))
 print("Best Parameter:  " + str(best_clf_weight .best_params_)) #0.82
 
+# Prediction
 y_test = best_clf_weight.best_estimator_.predict(test_df_transformed)
+
+# check number of survivors
+print("Number of survivors predicted: " + str(sum(y_test))) # 188
 
 
 # Export for submit
