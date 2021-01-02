@@ -58,6 +58,11 @@ train_df["Pclass"].replace(3, "Lower", inplace=True)
 # Replace missing age with median
 train_df["Age"].fillna(np.nanmedian(train_df["Age"]), inplace=True)
 
+# Create Age Bands
+
+# With family (overfitting and worse in production)
+# train_df["with_family"] = (train_df["SibSp"] + train_df["Parch"])>0
+
 # Replace NA for embarked with "Unknown"
 train_df["Embarked"].fillna("Unknown", inplace=True)
 
@@ -81,7 +86,7 @@ train_df["Deck"].replace("D D", "D", inplace=True)
 train_df["Deck"].replace("C C C", "C", inplace=True)
 train_df["Deck"].replace("F G", "F", inplace=True)
 train_df["Deck"].replace("F E", "E", inplace=True)
-
+train_df["Deck"].replace("T", "Unknown", inplace=True)
 
 # TEST DATA
 
@@ -102,6 +107,9 @@ test_df["Embarked"].fillna("Unknown", inplace=True)
 # Replace NA for Cabin with "Unknown"
 test_df["Cabin"].fillna("Unknown", inplace=True)
 
+# With family (overfitting and worse in production)
+# test_df["with_family"] = (test_df["SibSp"] + test_df["Parch"])>0
+
 # Extract Name Title
 test_df["Title"] = test_df.Name.apply(lambda x: x.split(",")[1].split(".")[0].strip())
 title_list = ["Mr", "Miss", "Mrs", "Master", "Dr", "Rev", "Col"]
@@ -120,6 +128,7 @@ test_df["Deck"].replace("D D", "D", inplace=True)
 test_df["Deck"].replace("C C C", "C", inplace=True)
 test_df["Deck"].replace("F G", "F", inplace=True)
 test_df["Deck"].replace("F E", "E", inplace=True)
+test_df["Deck"].replace("T", "Unknown", inplace=True)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -231,7 +240,7 @@ train_df_pre = train_df.drop(columns=["PassengerId", "Name", "Ticket", "Cabin"])
 test_df_pre = test_df.drop(columns=[ "Name", "Ticket", "Cabin"])
 
 num_attribs = ["Age", "SibSp", "Parch", "Fare"]
-cat_attribs = ["Pclass", "Embarked", "Deck", "Sex", "Title"]
+cat_attribs = ["Pclass", "Embarked", "Deck", "Sex", "Title"] #, "with_family"]
 
 col_transformer = ColumnTransformer([
     ("num", StandardScaler(), num_attribs),
@@ -261,9 +270,13 @@ test_df_transformed = pd.DataFrame(data=test_array_transformed)
 column_names = num_attribs + list(col_transformer.named_transformers_['cat'].get_feature_names()) + ["PassengerId"]
 test_df_transformed.columns = column_names
 
+# check columns
+train_df_transformed.columns
+test_df_transformed.columns
+
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Random Forest Classifier 0.81
+# Random Forest Classifier 0.8035
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import cross_val_score
@@ -295,7 +308,7 @@ export_df.to_csv("rnd_clf_simple.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Logistic Regression 0.83
+# Logistic Regression 0.8294
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import cross_val_score
@@ -335,7 +348,7 @@ export_df.to_csv("log_reg_simple.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Naive Bayes 0.75
+# Naive Bayes 0.7587
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import cross_val_score
@@ -365,7 +378,7 @@ export_df.to_csv("nb_simple.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Voting Classifier 0.79
+# Voting Classifier 0.8024
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import cross_val_score
@@ -395,7 +408,7 @@ export_df.to_csv("voting_simple.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Random Forest Classifier TUNED 0.84
+# Random Forest Classifier TUNED 0.8395
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import RandomizedSearchCV
@@ -437,7 +450,6 @@ best_rnd_clf = rnd_clf.fit(X_train, y_train)
 print("Best Random Forest Score: " + str(best_rnd_clf .best_score_))
 print("Best Parameter:  " + str(best_rnd_clf .best_params_))
 
-
 y_test = rnd_clf.predict(test_df_transformed)
 
 # Feature Importance
@@ -453,7 +465,7 @@ export_df.to_csv("rnd_clf_tuned.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Logistic Regression TUNED 0.83 -> no improvement
+# Logistic Regression TUNED 0.8294 -> no improvement
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import GridSearchCV
@@ -466,7 +478,7 @@ y_train = train_df_transformed["Survived"]
 lr = LogisticRegression()
 
 # Find optimal parameter settings using GridSearch
-param_grid = {"max_iter" : [2000],
+param_grid = {"max_iter" : [500,1000,2000],
               "penalty" : ["l1", "l2"],
               "C" : np.logspace(-4, 4, 20),
               "solver" : ["liblinear"]}
@@ -487,7 +499,7 @@ export_df["Survived"] = y_test.astype(int)
 export_df.to_csv("log_reg_tuned.csv", index=False)
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Voting Classifier TUNED  hard 0.83, weighted soft 0.82
+# Voting Classifier TUNED  hard 0.8238, weighted soft 0.8226 -> hbad in production
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import cross_val_score, GridSearchCV
@@ -509,6 +521,13 @@ print('voting_clf_hard mean :',cross_val_score(voting_clf_hard,X_train,y_train,c
 voting_clf_hard.fit(X_train, y_train)
 y_test = voting_clf_hard.predict(test_df_transformed)
 
+# Export for submit
+export_df = pd.DataFrame()
+export_df["PassengerId"] = test_df_transformed["PassengerId"].astype(int)
+export_df["Survived"] = y_test.astype(int)
+export_df.to_csv("voting_hard_tuned.csv", index=False)
+
+
 # Soft Voting with optimized weights
 
 voting_clf_soft = VotingClassifier(estimators=[("rnd_clf", best_rf), ("lr", best_lr), ("gnb", gnb)], voting = 'soft') 
@@ -526,12 +545,11 @@ y_test = best_clf_weight.best_estimator_.predict(test_df_transformed)
 export_df = pd.DataFrame()
 export_df["PassengerId"] = test_df_transformed["PassengerId"].astype(int)
 export_df["Survived"] = y_test.astype(int)
-export_df.to_csv("voting_hard_tuned.csv", index=False)
-#export_df.to_csv("voting_soft_tuned.csv", index=False)
+export_df.to_csv("voting_soft_tuned.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Random Forest TUNED without cabin/deck features 0.839
+# Random Forest TUNED without cabin/deck features 0.839 -> really bad in production
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import RandomizedSearchCV
