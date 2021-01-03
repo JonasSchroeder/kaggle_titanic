@@ -446,7 +446,7 @@ export_df.to_csv("voting_simple.csv", index=False)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------
-# Random Forest Classifier TUNED 0.8395 -> actual score ???
+# Random Forest Classifier TUNED 0.8395 -> actual score 0.77511
 #------------------------------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.model_selection import RandomizedSearchCV
