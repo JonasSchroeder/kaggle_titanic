@@ -192,32 +192,48 @@ sns.displot(train_df, x="Fare", hue="Survived")
 # Survivor split Class
 tbl = pd.pivot_table(train_df, index="Survived", columns="Pclass", values="Ticket", aggfunc="count")
 ax = tbl.T.plot(kind='bar')
-sns.countplot(data=train_df, y="Survived", hue="Pclass", color="Orange" )
 
 # Survivor split Sex
 tbl = pd.pivot_table(train_df, index="Survived", columns="Sex", values="Ticket", aggfunc="count")
 ax = tbl.T.plot(kind='bar') # female survive
-sns.countplot(data=train_df, y="Survived", hue="Sex", color="Orange" )
 
 # Survivor split SibSp
 tbl = pd.pivot_table(train_df, index="Survived", columns="SibSp", values="Ticket", aggfunc="count")
 ax = tbl.T.plot(kind='bar')
-sns.countplot(data=train_df, y="Survived", hue="SibSp", color="Orange" )
 
 # Survivor split Title
 tbl = pd.pivot_table(train_df, index="Survived", columns="Title", values="Ticket", aggfunc="count")
 ax = tbl.T.plot(kind='bar') # -> same as for sex
-# sns.countplot(data=train_df, y="Survived", hue="Title", color="Orange" )
+# sns.countplot(data=train_df, y="Survived", hue="Title", color="Blue" )
 
 # Survivor split Embarked
 tbl = pd.pivot_table(train_df, index="Survived", columns="Embarked", values="Ticket", aggfunc="count")
 ax = tbl.T.plot(kind='bar')
-sns.countplot(data=train_df, y="Survived", hue="Embarked", color="Orange" )
 
 # Survivor split Deck
 tbl = pd.pivot_table(train_df, index="Survived", columns="Deck", values="Ticket", aggfunc="count")
 ax = tbl.T.plot(kind='bar') # unknown deck for vast majority of people?
-sns.countplot(data=train_df, y="Survived", hue="Deck", color="Orange" )
+
+# Survival countplots all in one
+fig, axs = plt.subplots(2, 3, figsize=(10,8))
+sns.countplot(data=train_df, y="Survived", hue="Pclass", ax=axs.flatten()[0])
+axs.flatten()[0].legend(title="Pclass", loc=4)
+sns.countplot(data=train_df, y="Survived", hue="Sex", ax=axs.flatten()[1])
+axs.flatten()[1].legend(title="Sex", loc=4)
+axs.flatten()[1].set_ylabel('') 
+sns.countplot(data=train_df, y="Survived", hue="Deck", ax=axs.flatten()[2])
+axs.flatten()[2].set_ylabel('') 
+axs.flatten()[2].legend(title="Deck", loc=4)
+sns.countplot(data=train_df, y="Survived", hue="Parch", ax=axs.flatten()[3])
+axs.flatten()[3].legend(title="Parch", loc=4)
+sns.countplot(data=train_df, y="Survived", hue="SibSp", ax=axs.flatten()[4])
+axs.flatten()[4].set_ylabel('') 
+axs.flatten()[4].legend(title="SibSp", loc=4)
+sns.countplot(data=train_df, y="Survived", hue="Embarked", ax=axs.flatten()[5])
+axs.flatten()[5].set_ylabel('') 
+axs.flatten()[5].legend(title="Embarked", loc=4)
+fig.suptitle("Characteristics of Survivors vs Non-Survivors", size=14)
+
 
 # Fare per Deck, Port, Class
 fare_per_group = train_df.groupby(["Deck", "Embarked", "Pclass"]).agg({"Fare": "mean"})
